@@ -139,3 +139,70 @@ resource "aws_elasticache_cluster" "main" {
   enforce_https     = false
 }
 
+# ─── IMDSv1 VULNERABLE ────────────────────────────────────
+resource "aws_instance" "web" {
+  ami           = "ami-0c55b159cbfafe1f0"
+  instance_type = "t3.micro"
+
+  metadata_options {
+    http_tokens = "optional"
+  }
+}
+
+# ─── ALL PORTS OPEN ───────────────────────────────────────
+resource "aws_security_group" "all_open" {
+  name = "all-open"
+  ingress {
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# ─── ALL TRAFFIC ──────────────────────────────────────────
+resource "aws_security_group_rule" "all_traffic" {
+  type        = "ingress"
+  from_port   = 0
+  to_port     = 0
+  protocol    = "-1"
+  cidr_blocks = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.all_open.id
+}
+
+# ─── RDS NO BACKUP + NO DELETION PROTECTION ───────────────
+resource "aws_db_instance" "no_backup" {
+  identifier             = "no-backup-db"
+  engine                 = "postgres"
+  instance_class         = "db.t3.micro"
+  username               = "admin"
+  password               = "badpassword"
+  backup_retention_period = 0
+  deletion_protection    = false
+}
+
+# ─── LAMBDA PUBLIC ────────────────────────────────────────
+resource "aws_lambda_permission" "public" {
+  action        = "lambda:InvokeFunction"
+  function_name = "my-function"
+  principal     = "*"
+}
+
+# ─── SNS UNENCRYPTED ──────────────────────────────────────
+resource "aws_sns_topic" "alerts" {
+  name = "prod-alerts"
+}
+
+# ─── SQS UNENCRYPTED ──────────────────────────────────────
+resource "aws_sqs_queue" "jobs" {
+  name = "prod-jobs"
+}
+
+# ─── MFA DELETE DISABLED ──────────────────────────────────
+resource "aws_s3_bucket_versioning" "main" {
+  bucket = "prod-bucket"
+  versioning_configuration {
+    status     = "Enabled"
+    mfa_delete = "Disabled"
+  }
+}
