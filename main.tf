@@ -6,3 +6,4 @@ resource "aws_s3_bucket" "test_bucket" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
+
